@@ -13,8 +13,8 @@ import (
 
 type Func struct {
 	FullDescriptions         []string
-	functionDescriptions     []FunctionDescription
-	testFunctionDescriptions []FunctionDescription
+	FunctionDescriptions     []FunctionDescription
+	TestFunctionDescriptions []FunctionDescription
 }
 
 type FunctionDescription struct {
@@ -33,24 +33,20 @@ type Param struct {
 func (f *Func) ParseFunctions(p Param) {
 	code, err := readFile(p.FilePath)
 	if err != nil {
-		log.Println("Error reading file:", err)
+		log.Printf("Error reading file %s: %v", p.FilePath, err)
 		return
 	}
 
 	file, err := parseCode(p.FileName, code)
 	if err != nil {
-		log.Println("Error parsing file:", err)
+		log.Printf("Error parsing file %s: %v", p.FileName, err)
 		return
 	}
 
 	description, funcDescriptions, testFuncDescriptions := buildFileDescription(p, file, code)
 	f.FullDescriptions = append(f.FullDescriptions, description)
-	if funcDescriptions != nil {
-		f.functionDescriptions = append(f.functionDescriptions, funcDescriptions...)
-	}
-	if testFuncDescriptions != nil {
-		f.testFunctionDescriptions = append(f.testFunctionDescriptions, testFuncDescriptions...)
-	}
+	f.FunctionDescriptions = append(f.FunctionDescriptions, funcDescriptions...)
+	f.TestFunctionDescriptions = append(f.TestFunctionDescriptions, testFuncDescriptions...)
 }
 
 func (f *Func) Print() {
@@ -58,16 +54,17 @@ func (f *Func) Print() {
 		fmt.Println(desc)
 	}
 }
+
 func readFile(filePath string) (string, error) {
 	codeFile, err := os.Open(filePath)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to open file: %w", err)
 	}
 	defer codeFile.Close()
 
 	srcbuf, err := io.ReadAll(codeFile)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to read file: %w", err)
 	}
 	return string(srcbuf), nil
 }
@@ -79,47 +76,51 @@ func parseCode(fileName, code string) (*ast.File, error) {
 
 func buildFileDescription(p Param, file *ast.File, code string) (string, []FunctionDescription, []FunctionDescription) {
 	var sb strings.Builder
-	var funcDescriptions []FunctionDescription
-	var testFuncDescriptions []FunctionDescription
-	startFuncWord := fmt.Sprintf("##Start of go file %s \n", p.FilePath)
-	endFuncWord := fmt.Sprintf("----- End of go file %s ------- \n", p.FilePath)
-	funcWord := "##Functions\n"
-	if strings.Contains(p.FileName, "_test") {
-		startFuncWord = fmt.Sprintf("##Start of go test file %s \n", p.FilePath)
-		endFuncWord = fmt.Sprintf("----- End of go test file %s ------- \n", p.FilePath)
-		funcWord = "##Test Functions\n"
-	}
-	sb.WriteString(startFuncWord)
-	sb.WriteString(fmt.Sprintf("###File path: %s #######\n", p.FilePath))
-	sb.WriteString(fmt.Sprintf("###File name: %s #######\n", p.FileName))
-	sb.WriteString(fmt.Sprintf("## Package name: %s\n", file.Name.Name))
-	sb.WriteString(funcWord)
+	var funcDescriptions, testFuncDescriptions []FunctionDescription
+
+	isTestFile := strings.Contains(p.FileName, "_test")
+	writeFileHeader(&sb, p, file, isTestFile)
+
 	ast.Inspect(file, func(n ast.Node) bool {
 		if fn, ok := n.(*ast.FuncDecl); ok {
 			funcStr := describeFunctionDeclaration(&sb, fn, code, p.IncludeBody)
-			if strings.Contains(p.FileName, "_test") {
-				testFuncObj := FunctionDescription{
-					Name:           fn.Name.Name,
-					Doc:            funcStr,
-					Package:        file.Name.Name,
-					IsTestFunction: true,
-				}
-				testFuncDescriptions = append(testFuncDescriptions, testFuncObj)
-
+			funcDesc := FunctionDescription{
+				Name:           fn.Name.Name,
+				Doc:            funcStr,
+				Package:        file.Name.Name,
+				IsTestFunction: isTestFile,
+			}
+			if isTestFile {
+				testFuncDescriptions = append(testFuncDescriptions, funcDesc)
 			} else {
-				funcObj := FunctionDescription{
-					Name:           fn.Name.Name,
-					Doc:            funcStr,
-					Package:        file.Name.Name,
-					IsTestFunction: false,
-				}
-				funcDescriptions = append(funcDescriptions, funcObj)
+				funcDescriptions = append(funcDescriptions, funcDesc)
 			}
 		}
 		return true
 	})
-	sb.WriteString(endFuncWord)
+
+	writeFileFooter(&sb, p, isTestFile)
 	return sb.String(), funcDescriptions, testFuncDescriptions
+}
+
+func writeFileHeader(sb *strings.Builder, p Param, file *ast.File, isTestFile bool) {
+	fileType := "go"
+	if isTestFile {
+		fileType += " test"
+	}
+	sb.WriteString(fmt.Sprintf("##Start of %s file %s\n", fileType, p.FilePath))
+	sb.WriteString(fmt.Sprintf("###File path: %s\n", p.FilePath))
+	sb.WriteString(fmt.Sprintf("###File name: %s\n", p.FileName))
+	sb.WriteString(fmt.Sprintf("##Package name: %s\n", file.Name.Name))
+	sb.WriteString(fmt.Sprintf("##%s\n", strings.Title(fileType)+" Functions"))
+}
+
+func writeFileFooter(sb *strings.Builder, p Param, isTestFile bool) {
+	fileType := "go"
+	if isTestFile {
+		fileType += " test"
+	}
+	sb.WriteString(fmt.Sprintf("----- End of %s file %s -------\n", fileType, p.FilePath))
 }
 
 func describeFunctionDeclaration(funcSb *strings.Builder, fn *ast.FuncDecl, code string, includeBody bool) string {
@@ -181,8 +182,6 @@ func writeFunctionBody(sb *strings.Builder, fn *ast.FuncDecl, code string) {
 	sb.WriteString("```go\n")
 	sb.WriteString(code[fn.Pos()-1 : fn.End()-1])
 	sb.WriteString("```\n")
-	sb.WriteString(code[fn.Pos()-1 : fn.End()-1])
-
 }
 
 func expr(e ast.Expr) string {
