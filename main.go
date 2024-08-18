@@ -126,11 +126,11 @@ func (p *ProjectProcessor) writeOutputFiles(funcDescriptions Func) error {
 		return fmt.Errorf("failed to write descriptions to file: %w", err)
 	}
 
-	if err := p.writeJSONFile(funcDescriptions.testFunctionDescriptions, "test_functions.json"); err != nil {
+	if err := p.writeJSONFile(funcDescriptions.TestFunctionDescriptions, "test_functions.json"); err != nil {
 		return fmt.Errorf("failed to write test functions to file: %w", err)
 	}
 
-	if err := p.writeJSONFile(funcDescriptions.functionDescriptions, "functions.json"); err != nil {
+	if err := p.writeJSONFile(funcDescriptions.FunctionDescriptions, "functions.json"); err != nil {
 		return fmt.Errorf("failed to write functions to file: %w", err)
 	}
 
