@@ -126,10 +126,10 @@ func writeFileFooter(sb *strings.Builder, p Param, isTestFile bool) {
 func describeFunctionDeclaration(funcSb *strings.Builder, fn *ast.FuncDecl, code string, includeBody bool) string {
 	var sb strings.Builder
 	writeComments(&sb, fn.Doc)
-	sb.WriteString(fmt.Sprintf("## %s\n\n", fn.Name.Name))
+	sb.WriteString(fmt.Sprintf("##Function name: %s\n", fn.Name.Name))
 
 	if fn.Recv != nil {
-		sb.WriteString(fmt.Sprintf("## Receiver\n\n%s\n\n", fields(*fn.Recv)))
+		sb.WriteString(fmt.Sprintf("##Receiver: \n%s\n", fields(*fn.Recv)))
 	}
 
 	writeParameters(&sb, fn.Type.Params)
@@ -140,7 +140,7 @@ func describeFunctionDeclaration(funcSb *strings.Builder, fn *ast.FuncDecl, code
 		writeFunctionBody(&sb, fn, code)
 	}
 
-	sb.WriteString(fmt.Sprintf("`###End of function with name %s  ###`\n\n", fn.Name.Name))
+	sb.WriteString(fmt.Sprintf("`###End of function with name %s  ###`\n", fn.Name.Name))
 	funcSb.WriteString(sb.String())
 	return sb.String()
 }
@@ -155,18 +155,18 @@ func writeComments(sb *strings.Builder, doc *ast.CommentGroup) {
 
 func writeParameters(sb *strings.Builder, params *ast.FieldList) {
 	if params != nil {
-		sb.WriteString("##Parameters " + fields(*params) + "\n")
+		sb.WriteString("##Parameters: " + fields(*params) + "\n")
 	}
 }
 
 func writeResults(sb *strings.Builder, results *ast.FieldList) {
 	if results != nil {
-		sb.WriteString("##Return " + fields(*results) + "\n")
+		sb.WriteString("##Return: " + fields(*results) + "\n")
 	}
 }
 
 func writeFunctionCalls(sb *strings.Builder, fn *ast.FuncDecl, code string) {
-	sb.WriteString("## Function calls from other packages\n\n")
+	sb.WriteString("## Function calls from other packages\n")
 	sb.WriteString("```go\n")
 	ast.Inspect(fn, func(n ast.Node) bool {
 		if call, ok := n.(*ast.CallExpr); ok {
@@ -178,7 +178,7 @@ func writeFunctionCalls(sb *strings.Builder, fn *ast.FuncDecl, code string) {
 }
 
 func writeFunctionBody(sb *strings.Builder, fn *ast.FuncDecl, code string) {
-	sb.WriteString(fmt.Sprintf("####Function Body of function %s\n\n", fn.Name.Name))
+	sb.WriteString(fmt.Sprintf("####Function Body of function %s\n", fn.Name.Name))
 	sb.WriteString("```go\n")
 	sb.WriteString(code[fn.Pos()-1 : fn.End()-1])
 	sb.WriteString("```\n")
